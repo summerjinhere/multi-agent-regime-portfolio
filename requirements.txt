@@ -1,0 +1,10 @@
+yfinance
+pandas
+numpy
+scikit-learn
+hmmlearn
+statsmodels
+matplotlib
+seaborn
+scipy
+PyPortfolioOpt

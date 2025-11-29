@@ -1,0 +1,10 @@
+Ph.D. Thesis Statistical Validation Report
+==========================================
+
+Observed Sharpe Ratio: 1.7985
+Bootstrap 95% CI: [1.0062, 2.7554]
+Probability > Market (0.8): 99.31%
+
+Interpretation:
+The 95% Confidence Interval does not cross zero, indicating statistically significant positive risk-adjusted returns.
+The strategy outperforms the market benchmark with >95% confidence.
