@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jaeha K Agent | Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script>
+</head>
+
+<body>
+    <div class="app-container">
+        <header class="glass-panel">
+            <div class="logo">
+                <div class="logo-icon">JKA</div>
+                <h1>Jaeha K Agent</h1>
+            </div>
+            <div class="status-badge">
+                <span class="indicator pulse"></span>
+                System Active
+            </div>
+        </header>
+
+        <main>
+            <!-- Key Metrics Grid -->
+            <section class="metrics-grid">
+                <div class="metric-card glass-panel">
+                    <h3>Total Return</h3>
+                    <div class="value" id="metric-return">--%</div>
+                    <div class="sub-label">Cumulative Performance</div>
+                </div>
+                <div class="metric-card glass-panel">
+                    <h3>Sharpe Ratio</h3>
+                    <div class="value" id="metric-sharpe">--</div>
+                    <div class="sub-label">Risk-Adjusted Return</div>
+                </div>
+                <div class="metric-card glass-panel">
+                    <h3>Max Drawdown</h3>
+                    <div class="value negative" id="metric-drawdown">--%</div>
+                    <div class="sub-label">Peak to Trough</div>
+                </div>
+                <div class="metric-card glass-panel">
+                    <h3>Volatility</h3>
+                    <div class="value" id="metric-volatility">--%</div>
+                    <div class="sub-label">Annualized Std Dev</div>
+                </div>
+            </section>
+
+            <!-- Charts Area -->
+            <div class="charts-container">
+                <div class="chart-card glass-panel large">
+                    <div class="card-header">
+                        <h2>Portfolio Performance</h2>
+                        <div class="time-filters">
+                            <button class="active">All</button>
+                            <button>1Y</button>
+                            <button>YTD</button>
+                        </div>
+                    </div>
+                    <div id="performanceChart"></div>
+                </div>
+
+                <div class="chart-card glass-panel">
+                    <div class="card-header">
+                        <h2>Current Allocation</h2>
+                    </div>
+                    <div id="allocationChart"></div>
+                </div>
+
+                <div class="chart-card glass-panel">
+</body>
+
+</html>

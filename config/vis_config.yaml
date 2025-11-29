@@ -1,0 +1,57 @@
+# Visualization Config (Faster Backtest)
+market_data:
+  start_date: "2015-01-01"
+  cache_ttl_hours: 24
+  min_data_quality: 0.5
+  sectors:
+    Technology: ["AAPL", "MSFT", "NVDA", "AVGO", "ORCL", "ADBE", "CRM", "AMD", "INTC", "CSCO", "QCOM", "TXN", "IBM", "AMAT", "NOW", "INTU", "MU", "LRCX", "ADI", "KLAC"]
+    Healthcare: ["LLY", "UNH", "JNJ", "MRK", "ABBV", "TMO", "AMGN", "PFE", "ISRG", "SYK", "ELV", "VRTX", "REGN", "BMY", "GILD", "CVS", "CI", "MDT", "ZTS", "BSX"]
+    Financials: ["JPM", "V", "MA", "BAC", "WFC", "MS", "GS", "AXP", "SCHW", "C", "BLK", "SPGI", "PGR", "CB", "MMC", "USB", "PNC", "TFC", "COF", "TRV"]
+    Consumer_Discretionary: ["AMZN", "TSLA", "HD", "MCD", "NKE", "LOW", "SBUX", "BKNG", "TJX", "TGT", "MAR", "LVS", "HLT", "CMG", "YUM", "DHI", "LEN", "ORLY", "ROST", "TSCO"]
+    Energy: ["XOM", "CVX", "COP", "EOG", "SLB", "MPC", "PSX", "VLO", "OXY", "HES", "KMI", "WMB", "OKE", "TRGP", "HAL", "BKR", "DVN", "FANG", "CTRA", "MRO"]
+  bonds: ["TLT", "IEF", "LQD", "HYG", "SHY"]
+  commodities: ["GLD", "USO", "SLV", "CL=F", "PA=F", "PALL"]
+  others: ["^VIX"]
+
+ml:
+  n_components: 3
+  covariance_type: "full"
+  n_iter: 100
+  feature_window: 10
+  min_observations: 50
+
+quant:
+  lookback_window: 252
+  forecast_horizon: 5
+  use_shrinkage: true
+  regime_adjustment: true
+  regime_return_multipliers:
+    0: 1.0
+    1: 0.8
+    2: 0.5
+
+risk_manager:
+  target_volatility: 0.25
+  max_drawdown: 0.30
+  var_percentile: 95
+  lookback_risk: 63
+  max_position_size: 0.30
+  min_cash: 0.00
+  max_leverage: 1.0
+  circuit_breaker_threshold: 0.30
+
+portfolio:
+  use_black_litterman: true
+  rebalance_threshold: 0.05
+  max_turnover: 0.30
+  transaction_cost_bps: 10
+  risk_free_rate: 0.02
+
+orchestrator:
+  timeout_seconds: 60
+  retry_attempts: 3
+
+backtest:
+  initial_capital: 100000
+  start_date: "2020-01-01"
+  rebalance_freq: "M"
