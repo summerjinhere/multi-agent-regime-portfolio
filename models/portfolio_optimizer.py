@@ -28,7 +28,7 @@ class PortfolioOptimizer:
             market_weights = {k: 1.0/len(mu) for k in mu.index}
             
             # Delta (Risk Aversion)
-            delta = black_litterman.market_implied_risk_aversion(pd.Series(market_weights), risk_free_rate=0.02)
+            delta = black_litterman.market_implied_risk_aversion(pd.Series(market_weights), risk_free_rate=0.025)
             
             # Prior returns (Pi)
             prior_returns = black_litterman.market_implied_prior_returns(market_caps=pd.Series(market_weights), risk_aversion=delta, cov_matrix=S, risk_free_rate=0.02)

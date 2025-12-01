@@ -180,7 +180,6 @@ class TradeSignalEvent(Event):
     Contains final trade signals (BUY/SELL/HOLD).
     """
     target_weights: Dict[str, float] = field(default_factory=dict)
-    detailed_weights: Dict[str, float] = field(default_factory=dict)
     current_weights: Dict[str, float] = field(default_factory=dict)
     trades: List[TradeOrder] = field(default_factory=list)
     rebalance_reason: str = ""
@@ -191,6 +190,9 @@ class TradeSignalEvent(Event):
     optimization_method: str = "Black-Litterman"
     objective: str = "Max Sharpe"
     constraints_satisfied: bool = True
+    
+    # *** CRITICAL: Detailed stock-level weights for dashboard ***
+    detailed_weights: Dict[str, float] = field(default_factory=dict)
     
     def get_buy_orders(self) -> List[TradeOrder]:
         return [t for t in self.trades if t.action == "BUY"]
@@ -209,7 +211,8 @@ class TradeSignalEvent(Event):
             'n_sells': len(self.get_sell_orders()),
             'total_turnover': self.total_turnover,
             'estimated_cost': self.estimated_transaction_cost,
-            'rebalance_reason': self.rebalance_reason
+            'rebalance_reason': self.rebalance_reason,
+            'n_detailed_positions': len(self.detailed_weights)
         })
         return base
 

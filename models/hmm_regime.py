@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 class RegimeDetector:
-    def __init__(self, n_components=3, covariance_type="full", n_iter=1000):
+    def __init__(self, n_components=3, covariance_type="full", n_iter=10000):
         """
         Initialize HMM Regime Detector.
         :param n_components: Number of regimes (e.g., 3: Bull, Bear, Stagnation)

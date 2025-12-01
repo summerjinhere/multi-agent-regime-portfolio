@@ -1,7 +1,5 @@
 """
 Event System for Multi-Agent Portfolio Optimization
-====================================================
-Provides event classes and message bus for inter-agent communication.
 """
 
 from events.base_event import (
@@ -15,7 +13,7 @@ from events.base_event import (
     AgentStatusEvent
 )
 
-from events.message_bus import MessageBus, AsyncMessageBus
+from events.message_bus import MessageBus
 
 __all__ = [
     'Event',
@@ -26,6 +24,5 @@ __all__ = [
     'TradeSignalEvent',
     'TradeOrder',
     'AgentStatusEvent',
-    'MessageBus',
-    'AsyncMessageBus'
+    'MessageBus'
 ]

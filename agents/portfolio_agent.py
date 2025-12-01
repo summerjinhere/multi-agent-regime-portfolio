@@ -1,7 +1,12 @@
 """
-Portfolio Agent
-===============
+Portfolio Agent (FIXED)
+=======================
 Final portfolio optimization and trade signal generation.
+
+Key Fixes:
+1. Proper detailed_weights generation (stock-level)
+2. Less cash allocation
+3. Better stock selection within sectors
 """
 
 import pandas as pd
@@ -22,19 +27,10 @@ class PortfolioAgent(BaseAgent):
     """
     Portfolio Agent for final optimization and trade execution signals.
     
-    Responsibilities:
-    - Black-Litterman portfolio optimization
-    - Transaction cost modeling
-    - Turnover optimization
-    - Generate BUY/SELL/HOLD signals
-    - Stock selection within asset classes
-    
-    Config Options:
-        use_black_litterman: Use BL model (default: True)
-        rebalance_threshold: Min weight change to trigger rebalance (default: 0.05)
-        max_turnover: Maximum portfolio turnover per rebalance (default: 0.30)
-        transaction_cost_bps: Base transaction cost in basis points
-        risk_free_rate: Risk-free rate for Sharpe calculation
+    FIXED:
+    - Generates proper detailed_weights (stock-level allocation)
+    - Less cash allocation
+    - Better regime-based stock selection
     """
     
     def __init__(self, message_bus: MessageBus, config: Optional[Dict] = None):
@@ -42,8 +38,8 @@ class PortfolioAgent(BaseAgent):
         
         # Configuration
         self.use_black_litterman = self.get_config('use_black_litterman', True)
-        self.rebalance_threshold = self.get_config('rebalance_threshold', 0.05)
-        self.max_turnover = self.get_config('max_turnover', 0.30)
+        self.rebalance_threshold = self.get_config('rebalance_threshold', 0.03)  # Lower threshold
+        self.max_turnover = self.get_config('max_turnover', 0.40)  # Allow more turnover
         self.transaction_cost_bps = self.get_config('transaction_cost_bps', 10)
         self.risk_free_rate = self.get_config('risk_free_rate', 0.02)
         
@@ -51,7 +47,7 @@ class PortfolioAgent(BaseAgent):
         self.regime_slippage = {
             0: 5,    # Bull: low slippage
             1: 10,   # Transition
-            2: 25    # Bear: high slippage
+            2: 20    # Bear: higher slippage
         }
         
         # State
@@ -62,6 +58,7 @@ class PortfolioAgent(BaseAgent):
         # Current portfolio state
         self.current_weights: Dict[str, float] = {}
         self.target_weights: Dict[str, float] = {}
+        self.detailed_weights: Dict[str, float] = {}
     
     def _initialize(self) -> None:
         """Initialize Portfolio Agent."""
@@ -87,7 +84,7 @@ class PortfolioAgent(BaseAgent):
         Main processing:
         1. Optimize portfolio (Mean-Variance or Black-Litterman)
         2. Apply position limits
-        3. Calculate turnover and transaction costs
+        3. Generate detailed stock-level weights
         4. Generate trade orders (BUY/SELL/HOLD)
         5. Publish TradeSignalEvent
         """
@@ -123,18 +120,22 @@ class PortfolioAgent(BaseAgent):
                     )
             except Exception as e:
                 self.logger.error(f"Optimization failed: {e}. Falling back to Equal Weight.")
-                # Fallback to equal weight
                 n = len(expected_returns)
                 self.target_weights = {ticker: 1.0/n for ticker in expected_returns.index}
         
-        # Apply risk budget
+        # Apply risk budget (should be ~95%+)
         risk_budget = self.risk_signal.risk_budget
         self.target_weights = {k: v * risk_budget for k, v in self.target_weights.items()}
         
-        # Add cash for remaining allocation
+        # Add cash for remaining allocation (should be small, ~5%)
         total_invested = sum(self.target_weights.values())
         if total_invested < 1.0:
-            self.target_weights['Cash'] = 1.0 - total_invested
+            cash_allocation = 1.0 - total_invested
+            if cash_allocation > 0.001:  # Only add if meaningful
+                self.target_weights['Cash'] = cash_allocation
+        
+        # *** CRITICAL: Generate detailed stock-level weights ***
+        self.detailed_weights = self._generate_detailed_allocation()
         
         # Generate trade orders
         trades = self._generate_trade_orders()
@@ -146,7 +147,7 @@ class PortfolioAgent(BaseAgent):
         # Determine rebalance reason
         rebalance_reason = self._determine_rebalance_reason()
         
-        # Publish event
+        # Publish event with detailed_weights
         event = TradeSignalEvent(
             source_agent=self.name,
             target_weights=self.target_weights,
@@ -158,7 +159,7 @@ class PortfolioAgent(BaseAgent):
             optimization_method="Black-Litterman" if self.use_black_litterman else "Mean-Variance",
             objective="Max Sharpe",
             constraints_satisfied=True,
-            detailed_weights=self._generate_detailed_allocation()
+            detailed_weights=self.detailed_weights  # *** CRITICAL ***
         )
         
         self.publish(event)
@@ -169,7 +170,8 @@ class PortfolioAgent(BaseAgent):
         n_holds = len([t for t in trades if t.action == "HOLD"])
         
         self.logger.info(f"Published TradeSignalEvent: {n_buys} BUY, {n_sells} SELL, "
-                        f"{n_holds} HOLD, turnover={total_turnover:.2%}")
+                        f"{n_holds} HOLD, turnover={total_turnover:.2%}, "
+                        f"detailed_positions={len(self.detailed_weights)}")
     
     def _get_covariance_matrix(self) -> Optional[pd.DataFrame]:
         """Get covariance matrix from message bus history."""
@@ -183,20 +185,13 @@ class PortfolioAgent(BaseAgent):
     def _optimize_black_litterman(self, expected_returns: pd.Series,
                                   cov_matrix: pd.DataFrame,
                                   position_limits: Dict[str, float]) -> Dict[str, float]:
-        """
-        Black-Litterman portfolio optimization.
-        
-        Args:
-            expected_returns: Risk-adjusted expected returns (our views)
-            cov_matrix: Covariance matrix
-            position_limits: Max weight per asset
-            
-        Returns:
-            Optimal weights
-        """
+        """Black-Litterman portfolio optimization."""
         try:
             # Align data
             common_assets = list(set(expected_returns.index) & set(cov_matrix.index))
+            if len(common_assets) < 2:
+                raise ValueError("Not enough common assets")
+            
             mu = expected_returns[common_assets]
             S = cov_matrix.loc[common_assets, common_assets]
             
@@ -230,11 +225,7 @@ class PortfolioAgent(BaseAgent):
             
             # Optimize
             ef = EfficientFrontier(bl_returns, bl_cov)
-            
-            # Add position limits as constraints
-            for asset in common_assets:
-                if asset in position_limits:
-                    ef.add_constraint(lambda w, a=asset: w[list(common_assets).index(a)] <= position_limits[a])
+            ef.add_objective(objective_functions.L2_reg, gamma=0.1)  # Regularization
             
             # Maximize Sharpe
             weights = ef.max_sharpe(risk_free_rate=self.risk_free_rate)
@@ -249,9 +240,7 @@ class PortfolioAgent(BaseAgent):
     def _optimize_mean_variance(self, expected_returns: pd.Series,
                                 cov_matrix: pd.DataFrame,
                                 position_limits: Dict[str, float]) -> Dict[str, float]:
-        """
-        Standard Mean-Variance optimization (fallback).
-        """
+        """Standard Mean-Variance optimization (fallback)."""
         try:
             # Align data
             common_assets = list(set(expected_returns.index) & set(cov_matrix.index))
@@ -259,22 +248,10 @@ class PortfolioAgent(BaseAgent):
             S = cov_matrix.loc[common_assets, common_assets]
             
             ef = EfficientFrontier(mu, S)
-            
-            # Add regularization
             ef.add_objective(objective_functions.L2_reg, gamma=0.1)
             
             weights = ef.max_sharpe(risk_free_rate=self.risk_free_rate)
             cleaned = ef.clean_weights()
-            
-            # Apply position limits
-            for asset in cleaned:
-                if asset in position_limits:
-                    cleaned[asset] = min(cleaned[asset], position_limits[asset])
-            
-            # Renormalize
-            total = sum(cleaned.values())
-            if total > 0:
-                cleaned = {k: v/total for k, v in cleaned.items()}
             
             return cleaned
             
@@ -285,36 +262,118 @@ class PortfolioAgent(BaseAgent):
             return {k: 1.0/n for k in expected_returns.index}
     
     def _get_defensive_allocation(self, assets: pd.Index) -> Dict[str, float]:
-        """
-        Generate defensive allocation when circuit breaker is active.
-        Heavy cash, some bonds, minimal equity.
-        """
+        """Generate defensive allocation when circuit breaker is active."""
         weights = {}
         
         for asset in assets:
             if 'Bond' in asset or asset in ['TLT', 'IEF', 'SHY']:
-                weights[asset] = 0.15
-            elif 'Volatility' in asset or asset == '^VIX':
-                weights[asset] = 0.05
+                weights[asset] = 0.25
             elif 'Commodity' in asset or asset in ['GLD', 'SLV']:
-                weights[asset] = 0.05
+                weights[asset] = 0.10
             else:
-                weights[asset] = 0.02
+                weights[asset] = 0.05
         
-        # Normalize to leave room for cash
+        # Normalize
         total = sum(weights.values())
-        if total > 0.5:
-            weights = {k: v * 0.5 / total for k, v in weights.items()}
+        if total > 0.7:
+            weights = {k: v * 0.7 / total for k, v in weights.items()}
         
         return weights
     
-    def _generate_trade_orders(self) -> List[TradeOrder]:
+    def _generate_detailed_allocation(self) -> Dict[str, float]:
         """
-        Generate trade orders based on weight differences.
+        Generate detailed stock-level allocation from sector weights.
         
-        Returns:
-            List of TradeOrder objects
+        CRITICAL FIX: This creates actual ticker-level weights that can
+        be used to calculate portfolio returns.
         """
+        detailed_weights = {}
+        
+        if self.market_data is None:
+            self.logger.warning("No market data, cannot generate detailed weights")
+            return self.target_weights.copy()
+        
+        sector_mapping = self.market_data.sector_mapping
+        
+        for asset, weight in self.target_weights.items():
+            if weight <= 0.001:
+                continue
+            
+            # Check if asset is a sector
+            if asset in sector_mapping:
+                # Select top stocks within sector
+                top_stocks = self._select_stocks_for_sector(asset, n_top=5)
+                
+                if top_stocks:
+                    # Equal weight within sector
+                    stock_weight = weight / len(top_stocks)
+                    for stock in top_stocks:
+                        detailed_weights[stock] = stock_weight
+                    self.logger.debug(f"Sector {asset} ({weight:.1%}) -> {len(top_stocks)} stocks")
+                else:
+                    # Fallback: keep as sector weight
+                    detailed_weights[asset] = weight
+            else:
+                # Not a sector (Cash, Bonds proxy, etc.)
+                detailed_weights[asset] = weight
+        
+        # Validate
+        total = sum(detailed_weights.values())
+        self.logger.info(f"Detailed allocation: {len(detailed_weights)} positions, "
+                        f"total weight: {total:.2%}")
+        
+        return detailed_weights
+    
+    def _select_stocks_for_sector(self, sector: str, n_top: int = 5) -> List[str]:
+        """
+        Select top stocks within a sector based on regime.
+        
+        Bull: Favor momentum (high recent returns)
+        Bear: Favor low volatility
+        Transition: Balanced (Sharpe-like)
+        """
+        if self.market_data is None or self.market_data.prices is None:
+            return []
+        
+        sector_mapping = self.market_data.sector_mapping
+        if sector not in sector_mapping:
+            return []
+        
+        tickers = sector_mapping[sector]
+        valid_tickers = [t for t in tickers if t in self.market_data.prices.columns]
+        
+        if not valid_tickers:
+            return []
+        
+        # Use recent 60 days of data
+        prices = self.market_data.prices[valid_tickers].tail(60)
+        returns = prices.pct_change().dropna()
+        
+        if len(returns) < 10:
+            return valid_tickers[:n_top]
+        
+        current_regime = self.regime_event.current_regime if self.regime_event else 0
+        
+        # Score based on regime
+        if current_regime == 0:  # Bull: favor momentum
+            scores = returns.mean()
+        elif current_regime == 2:  # Bear: favor low vol
+            scores = -returns.std()
+        else:  # Transition: Sharpe-like
+            means = returns.mean()
+            stds = returns.std()
+            scores = means / stds.replace(0, np.inf)
+        
+        # Handle any NaN/inf
+        scores = scores.replace([np.inf, -np.inf], np.nan).dropna()
+        
+        if len(scores) == 0:
+            return valid_tickers[:n_top]
+        
+        return scores.nlargest(min(n_top, len(scores))).index.tolist()
+    
+    def _generate_trade_orders(self) -> List[TradeOrder]:
+        """Generate trade orders based on weight differences."""
         trades = []
         
         all_assets = set(self.target_weights.keys()) | set(self.current_weights.keys())
@@ -370,7 +429,6 @@ class PortfolioAgent(BaseAgent):
         
         reasons = []
         
-        # Check if regime-driven
         if self.regime_event:
             regime_name = self.regime_event.get_regime_name()
             if action == "SELL" and self.regime_event.current_regime == 2:
@@ -378,7 +436,6 @@ class PortfolioAgent(BaseAgent):
             elif action == "BUY" and self.regime_event.current_regime == 0:
                 reasons.append(f"Bull regime ({regime_name})")
         
-        # Check if risk-driven
         if self.risk_signal and self.risk_signal.circuit_breaker_active:
             reasons.append("Circuit breaker active")
         
@@ -397,7 +454,7 @@ class PortfolioAgent(BaseAgent):
             target_w = self.target_weights.get(asset, 0.0)
             turnover += abs(target_w - current_w)
         
-        return turnover / 2  # Divide by 2 since buy and sell cancel out
+        return turnover / 2
     
     def _estimate_transaction_cost(self, turnover: float) -> float:
         """Estimate total transaction cost as fraction of portfolio."""
@@ -417,39 +474,7 @@ class PortfolioAgent(BaseAgent):
         if self.regime_event:
             reasons.append(f"Regime: {self.regime_event.get_regime_name()}")
         
-        if self._calculate_turnover() > self.max_turnover:
-            reasons.append("Turnover limit applied")
-        
         return "; ".join(reasons) if reasons else "Scheduled rebalance"
-    
-    def _generate_detailed_allocation(self) -> Dict[str, float]:
-        """
-        Generate detailed stock-level allocation from sector weights.
-        """
-        detailed_weights = {}
-        
-        for asset, weight in self.target_weights.items():
-            if weight <= 0.001:
-                continue
-                
-            # Check if asset is a sector
-            if self.market_data and asset in self.market_data.sector_mapping:
-                # Select top stocks
-                top_stocks = self.select_stocks_for_sector(asset, n_top=5)
-                if top_stocks:
-                    # Equal weight within sector for now
-                    stock_weight = weight / len(top_stocks)
-                    for stock in top_stocks:
-                        detailed_weights[stock] = stock_weight
-                else:
-                    # Fallback if no stocks found (e.g. ETF)
-                    detailed_weights[asset] = weight
-            else:
-                # Not a sector (e.g. Cash, Bonds, specific ticker)
-                detailed_weights[asset] = weight
-        
-        self.logger.info(f"Generated detailed weights: {len(detailed_weights)} items")
-        return detailed_weights
     
     # =========================================================================
     # Public API
@@ -463,46 +488,8 @@ class PortfolioAgent(BaseAgent):
         """Get allocation summary."""
         return {
             'target_weights': self.target_weights,
+            'detailed_weights': self.detailed_weights,
             'current_weights': self.current_weights,
             'turnover': self._calculate_turnover(),
             'estimated_cost': self._estimate_transaction_cost(self._calculate_turnover())
         }
-    
-    def select_stocks_for_sector(self, sector: str, n_top: int = 5) -> List[str]:
-        """
-        Select top stocks within a sector based on regime.
-        
-        Args:
-            sector: Sector name
-            n_top: Number of stocks to select
-            
-        Returns:
-            List of selected ticker symbols
-        """
-        if self.market_data is None or self.market_data.prices is None:
-            return []
-        
-        sector_mapping = self.market_data.sector_mapping
-        if sector not in sector_mapping:
-            return []
-        
-        tickers = sector_mapping[sector]
-        valid_tickers = [t for t in tickers if t in self.market_data.prices.columns]
-        
-        if not valid_tickers:
-            return []
-        
-        prices = self.market_data.prices[valid_tickers]
-        returns = prices.pct_change()
-        
-        current_regime = self.regime_event.current_regime if self.regime_event else 0
-        
-        # Score based on regime
-        if current_regime == 0:  # Bull: favor momentum
-            scores = returns.mean()
-        elif current_regime == 2:  # Bear: favor low vol
-            scores = -returns.std()
-        else:  # Transition: balanced
-            scores = returns.mean() / returns.std()
-        
-        return scores.nlargest(n_top).index.tolist()
