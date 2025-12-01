@@ -1,63 +1,42 @@
-# Enhanced Multi-Agent Portfolio Optimization System
+# Multi-Agent Portfolio System v3.0
 
-## Version 2.0.0 | November 2025
+## 🎯 Overview
 
-A comprehensive portfolio optimization framework integrating:
-- **Regime-adaptive risk management** with variable risk aversion
-- **TWAP/VWAP execution algorithms** for optimal trade execution
-- **Institutional flow tracking** with piggyback trading (10% profit target)
-- **NLP sentiment analysis** from social media (English only, nuance-aware)
-- **Enhanced regime detection** using futures positioning and investor flows
-- **Rigorous statistical validation** (OLS, Bootstrap, Deflated Sharpe Ratio)
+A comprehensive multi-agent portfolio optimization system with:
+- **5 Sectors × 8 Stocks = 40 Equities**
+- **5 Agents**: MarketData, ML (HMM), Quant (MS-VECM), Risk, Portfolio
+- **Streamlit Dashboard**: Backtest results + Real-time monitoring
+- **Statistical Validation**: Bootstrap, DSR, Newey-West
 
 ---
 
 ## 📁 Project Structure
 
 ```
-enhanced_agent/
-├── __init__.py              # Package initialization
-├── main.py                  # Main orchestrator coordinating all agents
-├── requirements.txt         # Python dependencies
-├── README.md               # This file
+enhanced_agent_v3/
+├── main.py                 # Entry point
+├── orchestrator.py         # Agent orchestration & backtest engine
+├── requirements.txt
+├── README.md
 │
 ├── config/
-│   ├── __init__.py
-│   └── settings.py         # System configuration with regime parameters
-│
-├── models/
-│   ├── __init__.py
-│   ├── enhanced_regime_detector.py  # HMM + Futures + Flow regime detection
-│   └── regime_optimizer.py          # Mean-variance with regime-adaptive γ
-│
-├── execution/
-│   ├── __init__.py
-│   └── execution_algos.py  # TWAP, VWAP, Adaptive execution
+│   └── settings.py         # System configuration
 │
 ├── agents/
-│   ├── __init__.py
-│   └── institutional_flow_agent.py  # Flow detection & piggyback trading
-│
-├── nlp/
-│   ├── __init__.py
-│   └── sentiment_analyzer.py  # NLP sentiment with nuance learning
-│
-├── analysis/
-│   ├── __init__.py
-│   └── statistical_analysis.py  # OLS, Bootstrap, DSR validation
-│
-├── data/
-│   ├── __init__.py
-│   └── data_loader.py      # Data loading and export utilities
-│
-├── backtesting/
-│   └── __init__.py
+│   ├── base_agent.py       # Abstract base class
+│   ├── market_data_agent.py    # Data fetching (Yahoo Finance)
+│   ├── ml_agent.py         # HMM regime detection
+│   ├── quant_agent.py      # MS-VECM expected returns
+│   ├── risk_manager_agent.py   # VaR, position sizing
+│   └── portfolio_agent.py  # Black-Litterman optimization
 │
 ├── events/
-│   └── __init__.py
+│   └── message_bus.py      # Pub/sub event system
 │
-└── utils/
-    └── __init__.py
+├── dashboard/
+│   └── app.py              # Streamlit dashboard
+│
+└── results/                # Backtest outputs
 ```
 
 ---
@@ -67,307 +46,206 @@ enhanced_agent/
 ### Installation
 
 ```bash
-# Clone or extract the package
-cd enhanced_agent
-
-# Install dependencies
+cd enhanced_agent_v3
 pip install -r requirements.txt
-
-# For HMM support (recommended)
-pip install hmmlearn
-
-# For sentiment analysis with transformers (optional)
-pip install transformers torch
 ```
 
-### Basic Usage
+### Run Backtest
 
-```python
-from main import MultiAgentOrchestrator
-from config.settings import SystemConfig
-from data.data_loader import DataLoader
-
-# Initialize
-config = SystemConfig()
-orchestrator = MultiAgentOrchestrator(config)
-
-# Load data (or use synthetic)
-loader = DataLoader()
-prices, volumes = loader.generate_synthetic(
-    tickers=config.universe,
-    start_date='2018-01-01',
-    end_date='2025-11-30'
-)
-
-# Run backtest
-result = orchestrator.run_backtest(prices, volumes)
-
-# Print results
-orchestrator.print_results(result)
+```bash
+python main.py --backtest
 ```
 
-### Using Real Data (Yahoo Finance)
+### Launch Dashboard
 
-```python
-loader = DataLoader()
-prices = loader.load_yahoo(
-    tickers=['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'NVDA'],
-    start_date='2020-01-01',
-    end_date='2025-11-30'
-)
+```bash
+python main.py --dashboard
+# or
+streamlit run dashboard/app.py
+```
+
+### Run Both
+
+```bash
+python main.py --backtest --dashboard
 ```
 
 ---
 
-## ⚙️ Key Features
+## 📊 Asset Universe (55 Assets)
 
-### 1. Regime-Adaptive Risk Aversion
+### Equities (40 stocks)
 
-The optimizer adjusts risk aversion (γ) based on detected market regime:
+| Sector | Tickers |
+|--------|---------|
+| **Technology** | AAPL, MSFT, NVDA, AVGO, ORCL, ADBE, CRM, AMD |
+| **Healthcare** | LLY, UNH, JNJ, MRK, ABBV, TMO, AMGN, PFE |
+| **Financials** | JPM, V, MA, BAC, WFC, MS, GS, AXP |
+| **Consumer** | AMZN, TSLA, HD, MCD, NKE, LOW, SBUX, TGT |
+| **Energy** | XOM, CVX, COP, EOG, SLB, MPC, PSX, OXY |
 
-| Regime | Risk Aversion (γ) | Max Position | Risk Multiplier |
-|--------|-------------------|--------------|-----------------|
-| Bull (Low Vol) | 2.0 | 30% | 1.00 |
-| Normal | 3.0 | 25% | 0.90 |
-| Bear (High Vol) | 5.0 | 20% | 0.70 |
-| Crisis | 8.0 | 15% | 0.50 |
-| Recovery | 2.5 | 28% | 0.85 |
+### Fixed Income (5 ETFs)
+TLT, IEF, SHY, LQD, HYG
 
-```python
-# Customize risk aversion
-from models.regime_optimizer import RegimeAdaptiveOptimizer
+### Commodities (4 ETFs)
+GLD, USO, SLV, DBC
 
-optimizer = RegimeAdaptiveOptimizer(tickers)
-optimizer.set_regime_risk_aversion(regime=3, risk_aversion=10.0)  # Crisis
-```
+### Others (2 ETFs)
+VNQ (REITs), SPY (Benchmark)
 
-### 2. TWAP/VWAP Execution
+---
 
-```python
-from execution.execution_algos import ExecutionEngine, ExecutionAlgo, OrderSide
+## 🤖 Agent Architecture
 
-engine = ExecutionEngine({
-    'twap_intervals': 10,
-    'max_participation': 0.10  # Max 10% of volume
-})
+### 1. MarketDataAgent
+- Fetches data from Yahoo Finance
+- Caches data locally
+- Calculates returns and quality metrics
 
-# Submit TWAP order
-order = engine.submit_order(
-    ticker='AAPL',
-    side=OrderSide.BUY,
-    quantity=1000,
-    algo=ExecutionAlgo.TWAP,
-    duration_minutes=30
-)
+### 2. MLAgent (HMM Regime Detection)
+- 3-state Gaussian HMM
+- Features: Returns, Volatility
+- Outputs: Regime (Bull/Transition/Bear), Probabilities
 
-# Or VWAP for volume-following
-order = engine.submit_order(
-    ticker='AAPL',
-    side=OrderSide.BUY,
-    quantity=1000,
-    algo=ExecutionAlgo.VWAP
-)
-```
+### 3. QuantAgent (MS-VECM)
+- Johansen cointegration test
+- Vector Error Correction Model
+- Regime-adjusted expected returns
+- Ledoit-Wolf covariance shrinkage
 
-### 3. Institutional Flow & Piggyback Trading
+### 4. RiskManagerAgent
+- VaR/CVaR calculation
+- Drawdown monitoring
+- Position limits by regime
+- Risk parity budgeting
 
-```python
-from agents.institutional_flow_agent import PiggybackTrader, InstitutionalFlowDetector
+### 5. PortfolioAgent
+- Black-Litterman model
+- Mean-variance optimization
+- Turnover constraints
+- Rebalancing decisions
 
-# Detect institutional accumulation
-detector = InstitutionalFlowDetector({
-    'accumulation_threshold': 0.15,
-    'lookback_days': 20
-})
+---
 
-signal = detector.analyze_flow(ticker, prices, volumes)
+## ⚙️ Configuration
 
-# Piggyback trade with 10% profit target
-trader = PiggybackTrader({
-    'take_profit_pct': 0.10,  # Exit at +10%
-    'stop_loss_pct': 0.05,    # Exit at -5%
-    'short_tracking_enabled': True
-})
+Edit `config/settings.py` or create `config/agent_config.yaml`:
 
-position = trader.evaluate_entry(
-    ticker='AAPL',
-    signal=signal,
-    current_price=150.0,
-    available_capital=100000
-)
-```
+```yaml
+market_data:
+  start_date: '2015-01-01'
+  end_date: '2025-11-30'
+  sectors:
+    Technology: [AAPL, MSFT, NVDA, ...]
 
-### 4. NLP Sentiment Analysis
+ml:
+  n_components: 3
+  covariance_type: 'full'
 
-```python
-from nlp.sentiment_analyzer import NuanceSentimentAnalyzer, MarketSentimentAgent
+quant:
+  lookback_window: 252
+  use_shrinkage: true
 
-# Nuance-aware analyzer (English only)
-analyzer = NuanceSentimentAnalyzer(use_transformer=False)
+risk:
+  max_drawdown_limit: 0.20
+  var_confidence: 0.95
+  regime_params:
+    0:  # Bull
+      risk_multiplier: 1.0
+      max_position: 0.30
+    2:  # Bear
+      risk_multiplier: 0.70
+      max_position: 0.20
 
-text = "AAPL looking incredibly bullish! 🚀 Major breakout incoming"
-sentiment, confidence, keywords = analyzer.analyze_text(text)
-# sentiment: 0.75, confidence: 0.8, keywords: [('bullish', 0.9), ('breakout', 0.85)]
+portfolio:
+  use_black_litterman: true
+  rebalance_threshold: 0.03
 
-# For transformer-based (requires transformers package)
-analyzer = NuanceSentimentAnalyzer(use_transformer=True)  # Uses FinBERT
-```
-
-### 5. Enhanced Regime Detection
-
-Combines multiple signals:
-- HMM on price/volatility (40% weight)
-- Nasdaq futures positioning (20% weight)
-- Institutional/Retail/Foreign investor flows (25% weight)
-- Sentiment analysis (15% weight)
-
-```python
-from models.enhanced_regime_detector import EnhancedRegimeDetector
-
-detector = EnhancedRegimeDetector(n_regimes=5, config={
-    'hmm_weight': 0.40,
-    'futures_weight': 0.20,
-    'flow_weight': 0.25,
-    'sentiment_weight': 0.15
-})
-
-# Fit on historical data
-detector.fit_hmm(returns, volatility)
-
-# Get regime assessment
-assessment = detector.detect_regime(
-    current_return=0.01,
-    current_volatility=0.02,
-    futures_data={'commercial_net': 10000, ...},
-    flow_data={'institutional_buy': 1e6, ...},
-    sentiment_score=0.3
-)
-
-print(f"Regime: {assessment.primary_regime}")
-print(f"Risk Level: {assessment.risk_level:.2f}")
-print(f"Recommended Exposure: {assessment.recommended_exposure:.1%}")
-```
-
-### 6. Statistical Validation
-
-```python
-from analysis.statistical_analysis import (
-    StatisticalValidator, DeflatedSharpeRatio, BlockBootstrap
-)
-
-# Full validation suite
-validator = StatisticalValidator(confidence_level=0.95)
-results = validator.full_validation(
-    returns=strategy_returns,
-    benchmark_returns=spy_returns,
-    n_trials=10  # Number of strategy variations tried
-)
-
-# Individual tests
-dsr = DeflatedSharpeRatio.compute(returns, n_trials=10)
-print(f"Sharpe: {dsr.sharpe_ratio:.2f}, t-stat: {dsr.t_statistic:.2f}")
-print(f"PSR: {dsr.psr:.1%}, DSR: {dsr.dsr:.1%}")
-
-# Bootstrap
-bootstrap = BlockBootstrap(block_size=21, n_bootstrap=10000)
-boot_result = bootstrap.bootstrap_sharpe(returns)
-print(f"95% CI: [{boot_result.ci_lower:.2f}, {boot_result.ci_upper:.2f}]")
+backtest:
+  initial_capital: 1000000
+  start_date: '2020-01-01'
+  rebalance_freq: 'M'
 ```
 
 ---
 
-## 📊 Configuration
+## 📈 Dashboard Features
 
-Edit `config/settings.py` or create a YAML config:
+### Backtest Results View
+- Performance metrics (CAGR, Sharpe, Max DD)
+- Cumulative returns vs benchmark
+- Drawdown chart
+- Regime distribution
 
-```python
-from config.settings import SystemConfig
+### Real-time Monitor View
+- Current regime indicator
+- Portfolio value
+- Risk level
+- Live price chart
 
-config = SystemConfig(
-    # Universe
-    universe=['AAPL', 'MSFT', 'GOOGL', ...],
-    benchmark='SPY',
-    
-    # Capital
-    initial_capital=1_000_000,
-    risk_free_rate=0.05,
-    
-    # Rebalancing
-    rebalance_frequency='weekly',  # daily, weekly, monthly
-    max_turnover=0.30,
-    
-    # Risk limits
-    max_sector_exposure=0.35,
-    max_drawdown_limit=0.20,
-    var_limit_95=0.03
-)
-```
+### Analytics View
+- Monthly returns heatmap
+- Rolling metrics (252-day)
+- Return distribution
+- Q-Q plot
 
 ---
 
-## 📈 Output Metrics
+## 📊 Output Files
 
-The system calculates comprehensive metrics:
+After running backtest:
 
-**Performance:**
-- Total Return, CAGR, Volatility
-- Sharpe Ratio, Sortino Ratio
-- Maximum Drawdown, Calmar Ratio
-
-**Risk:**
-- VaR (95%), CVaR (95%)
-- Beta, Alpha
-- Win Rate
-
-**Statistical:**
-- t-statistic, p-value
-- Probabilistic Sharpe Ratio (PSR)
-- Deflated Sharpe Ratio (DSR)
-- Bootstrap Confidence Interval
+```
+results/
+├── returns.csv           # Daily returns
+├── portfolio_values.csv  # Portfolio value series
+├── weights_history.csv   # Historical weights
+└── metrics.csv           # Performance metrics
+```
 
 ---
 
 ## 🧪 Testing
 
 ```bash
-# Run tests
 pytest tests/ -v
-
-# With coverage
-pytest tests/ --cov=. --cov-report=html
 ```
 
 ---
 
-## 📚 References
+## 📚 Methodology
 
-1. Hamilton, J.D. (1989). A new approach to the economic analysis of nonstationary time series.
-2. Bailey, D.H. & López de Prado, M. (2014). The Deflated Sharpe Ratio.
-3. Ang, A. & Bekaert, G. (2002). International asset allocation with regime shifts.
-4. Lo, A.W. (2002). The statistics of Sharpe ratios.
-5. Nystrup, P. et al. (2017). Long memory of financial time series and HMM.
+### Regime Detection (HMM)
+- Gaussian Hidden Markov Model with 3 states
+- States ordered by volatility: Bull (low) → Bear (high)
+- Features: log returns, rolling volatility
+
+### Expected Returns (MS-VECM)
+1. Johansen cointegration test on asset classes
+2. If cointegrated: Fit VECM, forecast returns
+3. If not: Fall back to mean-variance
+4. Apply regime-based multipliers
+
+### Portfolio Optimization
+1. Black-Litterman: Combine market equilibrium with views
+2. Mean-variance with risk aversion γ (regime-dependent)
+3. Position limits and sector constraints
+4. Transaction cost awareness
 
 ---
 
 ## ⚠️ Disclaimer
 
-This software is for educational and research purposes only. Not financial advice. Past performance does not guarantee future results. Always conduct your own due diligence before making investment decisions.
+This software is for educational and research purposes only.
+Not financial advice. Past performance does not guarantee future results.
 
 ---
 
-## 📝 License
+## 📝 Version History
 
-MIT License - See LICENSE file for details.
-
----
-
-## 🔄 Changelog
-
-### v2.0.0 (November 2025)
-- Added regime-adaptive risk aversion
-- Implemented TWAP/VWAP execution algorithms
-- Added institutional flow tracking with piggyback trading
-- Integrated NLP sentiment analysis with nuance learning
-- Added futures positioning to regime detection
-- Enhanced statistical validation (DSR, Bootstrap)
-- Comprehensive documentation and examples
+### v3.0 (December 2025)
+- Full universe (55 assets across 5 sectors)
+- All 5 agents (MarketData, ML, Quant, Risk, Portfolio)
+- MS-VECM for cointegrated assets
+- Streamlit dashboard with 3 views
+- Event-driven architecture

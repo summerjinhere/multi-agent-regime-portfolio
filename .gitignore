@@ -20,3 +20,6 @@ logs/
 *.pkl
 *.pth
 *.pt
+
+# raw market data (Yahoo Finance terms: no redistribution) - regenerate locally
+data/market_data.csv

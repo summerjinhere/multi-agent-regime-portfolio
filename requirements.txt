@@ -1,8 +1,8 @@
-# Enhanced Multi-Agent Portfolio System
+# Multi-Agent Portfolio System v3.0
 # Requirements
-# ============
+# ====================================
 
-# Core dependencies
+# Core
 numpy>=1.21.0
 pandas>=1.3.0
 scipy>=1.7.0
@@ -11,25 +11,23 @@ scipy>=1.7.0
 scikit-learn>=1.0.0
 hmmlearn>=0.2.7
 
-# Data sources (optional)
+# Econometrics
+statsmodels>=0.13.0
+
+# Data
 yfinance>=0.2.0
-
-# NLP (optional - for advanced sentiment)
-# transformers>=4.20.0
-# torch>=1.10.0
-
-# Visualization (optional)
-matplotlib>=3.4.0
-seaborn>=0.11.0
-
-# Excel export (optional)
-openpyxl>=3.0.0
-
-# Configuration
 pyyaml>=6.0
 
-# Logging
-colorlog>=6.0.0
+# Visualization
+matplotlib>=3.4.0
+seaborn>=0.11.0
+plotly>=5.0.0
+
+# Dashboard
+streamlit>=1.28.0
+
+# Utilities
+tqdm>=4.60.0
 
 # Testing
 pytest>=7.0.0
